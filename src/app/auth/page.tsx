@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabaseBrowser } from "~/lib/supabaseClient";
 
 export default function AuthPage() {
@@ -11,6 +11,24 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // If already authenticated, decide where to go immediately
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!active) return;
+      if (data.user) {
+        try {
+          const statusRes = await fetch('/api/face/status');
+          const statusJson = await statusRes.json();
+          window.location.href = statusJson.enrolled ? '/' : '/face-enroll';
+        } catch {
+          window.location.href = '/face-enroll';
+        }
+      }
+    });
+    return () => { active = false; };
+  }, [supabase]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -18,16 +36,30 @@ export default function AuthPage() {
     setMessage(null);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage("Check your email for a confirmation link.");
+        // Attempt immediate session (depends on Supabase email confirmation settings)
+        if (!data.session) {
+          // Try sign in directly (if email confirmation disabled)
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInErr) {
+            setMessage("Account created. Please verify email in Supabase project settings OR disable confirmation to continue.");
+            return;
+          } else if (signInData.session) {
+            window.location.href = "/face-enroll";
+            return;
+          }
+        } else {
+          window.location.href = "/face-enroll";
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        window.location.href = "/";
+        window.location.href = "/face-enroll";
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");

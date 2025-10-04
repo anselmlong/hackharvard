@@ -15,26 +15,43 @@ export default function Home() {
       // First attempt local session
       const { data } = await supabase.auth.getUser();
       if (!cancelled && data.user) {
+        // Check enrollment status
+        try {
+          const statusRes = await fetch('/api/face/status');
+          const statusJson = await statusRes.json();
+          if (!statusJson.enrolled) {
+            window.location.href = '/face-enroll';
+            return;
+          }
+        } catch {
+          // If status endpoint fails, still allow page
+        }
         setEmail(data.user.email ?? null);
         setChecking(false);
         return;
       }
-      // Fallback to server validation endpoint
+      // Fallback to server validation endpoint (auth only)
       try {
-        const res = await fetch("/api/auth/session");
+        const res = await fetch('/api/auth/session');
         const json = await res.json();
         if (!cancelled) {
           if (json.authenticated && json.user) {
+            try {
+              const statusRes = await fetch('/api/face/status');
+              const statusJson = await statusRes.json();
+              if (!statusJson.enrolled) {
+                window.location.href = '/face-enroll';
+                return;
+              }
+            } catch {}
             setEmail(json.user.email);
             setChecking(false);
           } else {
-            window.location.href = "/auth";
+            window.location.href = '/auth';
           }
         }
       } catch {
-        if (!cancelled) {
-          window.location.href = "/auth";
-        }
+        if (!cancelled) window.location.href = '/auth';
       }
     };
     run();
