@@ -1,18 +1,86 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LiveVideoFeed } from "./_components/LiveVideoFeed";
+import { supabaseBrowser } from "~/lib/supabaseClient";
 
 export default function Home() {
+  const supabase = supabaseBrowser();
+  const [email, setEmail] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      // First attempt local session
+      const { data } = await supabase.auth.getUser();
+      if (!cancelled && data.user) {
+        setEmail(data.user.email ?? null);
+        setChecking(false);
+        return;
+      }
+      // Fallback to server validation endpoint
+      try {
+        const res = await fetch("/api/auth/session");
+        const json = await res.json();
+        if (!cancelled) {
+          if (json.authenticated && json.user) {
+            setEmail(json.user.email);
+            setChecking(false);
+          } else {
+            window.location.href = "/auth";
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          window.location.href = "/auth";
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/auth";
+  };
+
+  if (checking) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-9 h-9 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          <p className="text-xs tracking-wide text-white/60">Checking session…</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white flex flex-col items-center py-12 px-4">
-      <header className="w-full max-w-5xl mb-10 flex flex-col items-center gap-4 text-center">
+      <header className="w-full max-w-5xl mb-10 flex flex-col items-center gap-3 text-center">
+        <div className="flex w-full justify-end mb-2">
+          {email && (
+            <button
+              onClick={signOut}
+              className="text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/20 transition border border-white/10"
+            >
+              Sign out
+            </button>
+          )}
+        </div>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-transparent">
           Facial Interaction Captcha (Prototype)
         </h1>
+        {email && (
+          <p className="text-xs text-white/50">Signed in as {email}</p>
+        )}
         <p className="text-sm md:text-base text-white/60 max-w-2xl leading-relaxed">
-          Skeleton page: live camera feed only. Security levels, challenges &
-          detection logic will be layered on later. Your video never leaves the
-          browser—this is a local preview feed.
+          Skeleton page: live camera feed only. Security levels & challenges will
+          be added later.
         </p>
       </header>
 
