@@ -1,53 +1,51 @@
-import Link from "next/link";
+"use client";
 
-import { LatestPost } from "~/app/_components/post";
-import { api, HydrateClient } from "~/trpc/server";
+import { LiveVideoFeed } from "./_components/LiveVideoFeed";
 
-export default async function Home() {
-  const hello = await api.post.hello({ text: "from tRPC" });
-
-  void api.post.getLatest.prefetch();
-
+export default function Home() {
   return (
-    <HydrateClient>
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-        <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
-          </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/usage/first-steps"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">First Steps →</h3>
-              <div className="text-lg">
-                Just the basics - Everything you need to know to set up your
-                database and authentication.
-              </div>
-            </Link>
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/introduction"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">Documentation →</h3>
-              <div className="text-lg">
-                Learn more about Create T3 App, the libraries it uses, and how
-                to deploy it.
-              </div>
-            </Link>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-2xl text-white">
-              {hello ? hello.greeting : "Loading tRPC query..."}
-            </p>
+    <main className="min-h-screen w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white flex flex-col items-center py-12 px-4">
+      <header className="w-full max-w-5xl mb-10 flex flex-col items-center gap-4 text-center">
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-transparent">
+          Facial Interaction Captcha (Prototype)
+        </h1>
+        <p className="text-sm md:text-base text-white/60 max-w-2xl leading-relaxed">
+          Skeleton page: live camera feed only. Security levels, challenges &
+          detection logic will be layered on later. Your video never leaves the
+          browser—this is a local preview feed.
+        </p>
+      </header>
+
+      <section className="w-full max-w-5xl flex flex-col items-center gap-8">
+        <LiveVideoFeed />
+
+        <div className="grid gap-4 w-full max-w-xl text-xs text-white/50">
+          <div className="border border-white/10 rounded-lg p-4 bg-white/5 backdrop-blur-sm">
+            <p className="font-semibold mb-1 text-white/80">Planned Next Layers</p>
+            <ul className="list-disc list-inside space-y-1 marker:text-fuchsia-400">
+              <li>Expression prompts (😃 😗 😉 😧 😬)</li>
+              <li>Tongue True/False gesture capture</li>
+              <li>Adaptive challenge sequencing</li>
+              <li>Real-time overlay & confidence scores</li>
+              <li>Benchmark / endless reasoning mode</li>
+            </ul>
           </div>
 
-          <LatestPost />
+          <div className="border border-white/10 rounded-lg p-4 bg-white/5 backdrop-blur-sm">
+            <p className="font-semibold mb-1 text-white/80">Troubleshooting</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>If the feed is black: ensure only one tab/app uses the camera.</li>
+              <li>Check site permissions (camera) in the browser bar.</li>
+              <li>Reload after granting access.</li>
+              <li>Incognito windows sometimes block permissions by policy.</li>
+            </ul>
+          </div>
         </div>
-      </main>
-    </HydrateClient>
+      </section>
+
+      <footer className="mt-14 text-[10px] text-white/40 tracking-wide">
+        Prototype build — no data stored or transmitted.
+      </footer>
+    </main>
   );
 }
