@@ -5,6 +5,7 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import base64
+import os
 
 app = FastAPI()
 
@@ -18,9 +19,10 @@ app.add_middleware(
 
 DETECTIONS = ['tongue_left', 'tongue_right', 'tongue_up', 'tongue_down', 'tongue_center', 'no_tongue']
 
-MODEL_PATH = '../yolo/runs/detect/exp1/weights/best.pt'
+MODEL_PATH = os.getenv('MODEL_PATH', '../yolo/runs/detect/exp1/weights/best.pt')
 
 print("🚀 Loading YOLO model into RAM...")
+print(f"   Model path: {MODEL_PATH}")
 model = YOLO(MODEL_PATH)
 print("✅ Model loaded and ready!")
 print(f"   Classes: {list(model.names.values())}")

@@ -5,13 +5,16 @@ FastAPI server that runs YOLOv8 model for real-time tongue position detection.
 ## Setup
 
 ```bash
-# Install dependencies
+
+# 2. Add required environment variables to .env.local:
+# - MODEL_PATH="../yolo/runs/detect/exp1/weights/best.pt"
+# - MODEL_SERVER_URL="http://localhost:8000"
+# - NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# Add Jensen's trained model
-# Place best.pt in models/ folder
-
-# Run server
+# 4. Run server
 uvicorn server:app --reload --port 8000
 ```
 
