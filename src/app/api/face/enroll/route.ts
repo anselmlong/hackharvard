@@ -30,12 +30,12 @@ export async function POST(req: Request) {
     // Store vector in a table (placeholder): ensure a table `face_vectors (user_id uuid primary key, embedding jsonb)` exists.
     const { data: rows, error: upsertError } = await supabase
       .from('face_vectors')
-      .upsert({ user_id: user.id, embedding: vector })
-      .select('user_id');
+      .upsert({ id: user.id, embedding: vector })
+      .select('id');
     if (upsertError) {
       return NextResponse.json({ success: false, error: upsertError.message }, { status: 500 });
     }
-  return NextResponse.json({ success: true, userId: rows?.[0]?.user_id, dimensions: vector.length });
+  return NextResponse.json({ success: true, userId: rows?.[0]?.id, dimensions: vector.length });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }

@@ -6,7 +6,7 @@ import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 
 export const metadata: Metadata = {
-  title: "CaptchRAH",
+  title: "Freak-cha",
   description: "For HackHarvard 2025",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };

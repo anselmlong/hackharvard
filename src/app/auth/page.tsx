@@ -22,7 +22,7 @@ export default function AuthPage() {
           const statusJson = await statusRes.json();
           window.location.href = statusJson.enrolled ? '/' : '/face-enroll';
         } catch {
-          window.location.href = '/face-enroll';
+          window.location.href = '/auth';
         }
       }
     });

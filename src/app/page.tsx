@@ -22,6 +22,9 @@ export default function Home() {
           if (!statusJson.enrolled) {
             window.location.href = '/face-enroll';
             return;
+          } else {
+            window.location.href = '/face-verify';
+            return;
           }
         } catch {
           // If status endpoint fails, still allow page
@@ -41,6 +44,9 @@ export default function Home() {
               const statusJson = await statusRes.json();
               if (!statusJson.enrolled) {
                 window.location.href = '/face-enroll';
+                return;
+              } else {
+                window.location.href = '/face-verify';
                 return;
               }
             } catch {}
