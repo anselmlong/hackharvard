@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     if (!data.user) {
       return NextResponse.json({ authenticated: false }, { status: 200 });
     }
+    
     return NextResponse.json({ authenticated: true, user: { id: data.user.id, email: data.user.email } });
   } catch (e) {
     return NextResponse.json({ authenticated: false, error: (e as Error).message }, { status: 200 });
