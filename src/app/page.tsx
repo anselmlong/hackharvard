@@ -1,74 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LiveVideoFeed } from "./_components/LiveVideoFeed";
 import { supabaseBrowser } from "~/lib/supabaseClient";
 
 export default function Home() {
   const supabase = supabaseBrowser();
+  const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      // First attempt local session
-      const { data } = await supabase.auth.getUser();
-      if (!cancelled && data.user) {
-        // Check enrollment status
-        try {
-          const statusRes = await fetch('/api/face/status');
-          const statusJson = await statusRes.json();
-          if (!statusJson.enrolled) {
-            window.location.href = '/face-enroll';
-            return;
-          } else {
-            window.location.href = '/face-verify';
-            return;
-          }
-        } catch {
-          // If status endpoint fails, still allow page
-        }
-        setEmail(data.user.email ?? null);
-        setChecking(false);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled || !user) {
+        router.replace('/auth');
         return;
       }
-      // Fallback to server validation endpoint (auth only)
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string,string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
       try {
-        const res = await fetch('/api/auth/session');
-        const json = await res.json();
-        if (!cancelled) {
-          if (json.authenticated && json.user) {
-            try {
-              const statusRes = await fetch('/api/face/status');
-              const statusJson = await statusRes.json();
-              if (!statusJson.enrolled) {
-                window.location.href = '/face-enroll';
-                return;
-              } else {
-                window.location.href = '/face-verify';
-                return;
-              }
-            } catch {}
-            setEmail(json.user.email);
-            setChecking(false);
-          } else {
-            window.location.href = '/auth';
-          }
+        const res = await fetch('/api/face/status', { headers });
+        const status: { enrolled?: boolean } = await res.json();
+        if (!status.enrolled) {
+          router.replace('/face-enroll');
+          return;
         }
+        setEmail(user.email ?? null);
+        setChecking(false);
       } catch {
-        if (!cancelled) window.location.href = '/auth';
+        setEmail(user.email ?? null);
+        setChecking(false);
       }
     };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase]);
+    void run();
+    return () => { cancelled = true; };
+  }, [supabase, router]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/auth";
+    router.replace("/auth");
   };
 
   if (checking) {

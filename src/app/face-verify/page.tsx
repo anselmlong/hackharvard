@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '~/lib/supabaseClient';
 import { computeFaceEmbedding } from '~/lib/faceMeshEmbed';
 
@@ -7,6 +8,7 @@ interface VerifyResponse { success: boolean; match?: boolean; similarity?: numbe
 
 export default function FaceVerifyPage() {
   const supabase = supabaseBrowser();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [status, setStatus] = useState('Initializing camera…');
   const [similarity, setSimilarity] = useState<number | null>(null);
@@ -16,15 +18,12 @@ export default function FaceVerifyPage() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      if (!data.user) {
-        window.location.href = '/auth';
+    const init = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!active || !data.user) {
+        router.replace('/auth');
         return;
       }
-    });
-
-    (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
         if (videoRef.current) {
@@ -33,11 +32,12 @@ export default function FaceVerifyPage() {
           setStatus('Ready for verification');
         }
       } catch (e) {
-        setStatus('Camera error: ' + (e instanceof Error ? e.message : 'unknown'));
+        setStatus('Camera error: ' + (e instanceof Error ? (e as Error).message : 'unknown'));
       }
-    })();
+    };
+    void init();
     return () => { active = false; const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks(); tracks?.forEach(t=>t.stop()); };
-  }, [supabase]);
+  }, [supabase, router]);
 
   const verify = async () => {
     if (!videoRef.current) return;
@@ -65,7 +65,7 @@ export default function FaceVerifyPage() {
         },
         body: JSON.stringify({ vector: embedding.vector })
       });
-      const json: VerifyResponse = await res.json();
+  const json: VerifyResponse = await res.json();
       if (!json.success) {
         setStatus('Error: ' + (json.error || 'unknown'));
       } else {
@@ -74,12 +74,12 @@ export default function FaceVerifyPage() {
         setThreshold(json.threshold ?? null);
         if (json.match) {
           setStatus('Match confirmed. Redirecting…');
-          setTimeout(()=>{ window.location.href = '/'; }, 800);
+          setTimeout(()=>{ router.replace('/'); }, 800);
         } else {
           setStatus('Face did not match. Try again.');
         }
       }
-    } catch (e) {
+    } catch (_e) {
       setStatus('Verify error');
     } finally {
       setLoading(false);

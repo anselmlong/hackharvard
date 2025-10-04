@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '~/lib/supabaseClient';
 import { computeFaceEmbedding } from '~/lib/faceMeshEmbed';
 
@@ -7,6 +8,7 @@ interface EmbeddingResponse { success: boolean; vectorId?: string; error?: strin
 
 export default function FaceEnrollPage() {
   const supabase = supabaseBrowser();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -17,20 +19,21 @@ export default function FaceEnrollPage() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      if (!data.user) {
-        window.location.href = '/auth';
-      } else {
-        setUserEmail(data.user.email ?? null);
-        // Check enrollment status
-        fetch('/api/face/status').then(r => r.json()).then(json => {
-          if (json.enrolled) setStatus('Already enrolled');
-        }).catch(() => {});
+    const setup = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!active || !data.user) {
+        router.replace('/auth');
+        return;
       }
-    });
-
-    const init = async () => {
+      setUserEmail(data.user.email ?? null);
+      // Include bearer token for status
+      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const headers: Record<string,string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+        const statusRes = await fetch('/api/face/status', { headers });
+        const statusJson: { enrolled?: boolean } = await statusRes.json();
+        if (statusJson.enrolled) setStatus('Already enrolled');
+      } catch {/* ignore */}
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
         if (videoRef.current) {
@@ -41,9 +44,9 @@ export default function FaceEnrollPage() {
         setStreamError(e instanceof Error ? e.message : 'Camera error');
       }
     };
-    init();
+    void setup();
     return () => { active = false; const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks(); tracks?.forEach(t=>t.stop()); };
-  }, [supabase]);
+  }, [supabase, router]);
 
   const capture = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -94,12 +97,12 @@ export default function FaceEnrollPage() {
       if (json.success) {
         const dims = json.dimensions ? `${json.dimensions} dims` : '';
         setStatus(`Enrollment complete ${dims && '(' + dims + ')'}`);
-        setTimeout(()=>{ window.location.href = '/'; }, 1000);
+        setTimeout(()=>{ router.replace('/'); }, 1000);
       } else {
         setStatus('Failed: ' + (json.error || 'Unknown error'));
       }
-    } catch (e) {
-      setStatus('Embedding error');
+      } catch (_e) {
+        setStatus('Embedding error');
     } finally {
       setUploading(false);
     }

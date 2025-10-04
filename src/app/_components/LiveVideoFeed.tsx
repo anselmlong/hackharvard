@@ -17,36 +17,26 @@ export const LiveVideoFeed = () => {
 			setStatus("requesting");
 			try {
 				stream = await navigator.mediaDevices.getUserMedia({
-					video: {
-						width: { ideal: 1280 },
-						height: { ideal: 720 },
-						facingMode: "user",
-					},
+					video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
 					audio: false,
 				});
-				if (!videoRef.current) return;
-				videoRef.current.srcObject = stream;
-				videoRef.current.play(); // to display the camera feed
-				const track = stream.getVideoTracks()[0];
-				if (track) {
-					const settings = track.getSettings();
-					if (settings.width && settings.height) {
+				if (videoRef.current) {
+					videoRef.current.srcObject = stream;
+					await videoRef.current.play().catch(() => { /* autoplay blocked */ });
+					const track = stream.getVideoTracks()[0];
+					const settings = track?.getSettings();
+					if (settings?.width && settings?.height) {
 						setResolution(`${settings.width}x${settings.height}`);
 					}
+					setStatus("ready");
 				}
-				await videoRef.current.play().catch(() => {/* autoplay blocked */ });
-				setStatus("ready");
 			} catch (e) {
 				setStatus("error");
-				setError(
-					e instanceof Error ? e.message : "Unknown error requesting camera"
-				);
+				setError(e instanceof Error ? e.message : "Unknown error requesting camera");
 			}
 		};
-		start();
-		return () => {
-			stream?.getTracks().forEach((t) => t.stop());
-		};
+		void start();
+		return () => { stream?.getTracks().forEach(t => t.stop()); };
 	}, []);
 
 	return (

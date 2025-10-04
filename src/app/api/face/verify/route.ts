@@ -14,16 +14,16 @@ function cosine(a: number[], b: number[]): number {
 
 export async function POST(req: Request) {
   try {
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
     let accessToken: string | undefined;
-    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    if (authHeader?.toLowerCase().startsWith('bearer ')) {
       accessToken = authHeader.slice(7).trim();
     }
     const supabase = createServerSupabaseClient(accessToken);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
 
-    if (!(req.headers.get('content-type') || '').includes('application/json')) {
+    if (!(req.headers.get('content-type') ?? '').includes('application/json')) {
       return NextResponse.json({ success: false, error: 'Expected application/json { vector:number[] }' }, { status: 400 });
     }
     const body = await req.json().catch(()=>null) as { vector?: number[] } | null;
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Invalid vector' }, { status: 400 });
     }
 
-  const { data: existing, error } = await supabase.from('face_vectors').select('embedding').eq('id', user.id).maybeSingle();
+    const { data: existing, error } = await supabase.from('face_vectors').select('embedding').eq('id', user.id).maybeSingle();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     if (!existing?.embedding) {
       return NextResponse.json({ success: false, error: 'No enrollment', enrolled: false }, { status: 400 });

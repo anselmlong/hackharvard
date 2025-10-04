@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "~/lib/supabaseClient";
 
 export default function AuthPage() {
@@ -12,22 +13,40 @@ export default function AuthPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   // If already authenticated, decide where to go immediately
+  const router = useRouter();
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!active) return;
-      if (data.user) {
-        try {
-          const statusRes = await fetch('/api/face/status');
-          const statusJson = await statusRes.json();
-          window.location.href = statusJson.enrolled ? '/' : '/face-enroll';
-        } catch {
-          window.location.href = '/auth';
-        }
+    const run = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!active || !data.user) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string,string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+        const statusRes = await fetch('/api/face/status', { headers });
+    const statusJson = await statusRes.json() as { enrolled?: boolean };
+        router.replace(statusJson.enrolled ? '/face-verify' : '/face-enroll');
+      } catch {
+        /* ignore */
       }
-    });
+    };
+    void run();
     return () => { active = false; };
-  }, [supabase]);
+  }, [supabase, router]);
+
+  const postAuthRedirect = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      router.replace('/face-enroll'); // fallback
+      return;
+    }
+    try {
+  const statusRes = await fetch('/api/face/status', { headers: { Authorization: `Bearer ${session.access_token}` } });
+  const statusJson = await statusRes.json() as { enrolled?: boolean };
+  router.replace(statusJson.enrolled ? '/face-verify' : '/face-enroll');
+    } catch {
+      router.replace('/face-enroll');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,14 +62,14 @@ export default function AuthPage() {
           // Try sign in directly (if email confirmation disabled)
           const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
           if (signInErr) {
-            setMessage("Account created. Please verify email in Supabase project settings OR disable confirmation to continue.");
+            setMessage("Account created.");
             return;
           } else if (signInData.session) {
-            window.location.href = "/face-enroll";
+            await postAuthRedirect(); // uses router.replace internally now
             return;
           }
         } else {
-          window.location.href = "/face-enroll";
+          await postAuthRedirect();
           return;
         }
       } else {
@@ -59,7 +78,7 @@ export default function AuthPage() {
           password,
         });
         if (error) throw error;
-        window.location.href = "/face-enroll";
+  await postAuthRedirect();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");

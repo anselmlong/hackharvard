@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '~/lib/supabaseServer';
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) { // unused param prefixed with _ to satisfy lint
   try {
     // Extract bearer token from cookies (supabase sets sb-<ref>-auth-token) — we only get access token via client
     // For simplicity, rely on client forwarding no token, just attempt anonymous user fetch (will fail gracefully)
