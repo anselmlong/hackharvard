@@ -15,16 +15,18 @@ export default function AuthPage() {
   // If already authenticated, decide where to go immediately
   const router = useRouter();
   const redirectTimerRef = useRef<number | null>(null);
+  const hasRedirectedRef = useRef(false);
   useEffect(() => {
     let active = true;
     const run = async () => {
       const { data } = await supabase.auth.getUser();
-      if (!active || !data.user) return;
+      if (!active) return;
+      if (!data.user) return;
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       redirectTimerRef.current = window.setTimeout(async () => {
         if (!active) return;
         const { data: latest } = await supabase.auth.getUser();
-        if (!latest.user) return;
+        if (!latest.user || hasRedirectedRef.current) return;
         try {
           const {
             data: { session },
@@ -34,16 +36,27 @@ export default function AuthPage() {
             : {};
           const statusRes = await fetch("/api/face/status", { headers });
           const statusJson = (await statusRes.json()) as { enrolled?: boolean };
+          hasRedirectedRef.current = true;
           router.replace(statusJson.enrolled ? "/face-verify" : "/face-enroll");
         } catch {
           /* ignore */
         }
       }, 300);
     };
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === "SIGNED_IN") {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        hasRedirectedRef.current = false;
+        void run();
+      }
+    });
+
     void run();
     return () => {
       active = false;
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      authListener.subscription.unsubscribe();
     };
   }, [supabase, router]);
 

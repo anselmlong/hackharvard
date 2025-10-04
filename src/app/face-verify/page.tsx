@@ -17,6 +17,7 @@ export default function FaceVerifyPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const redirectTimerRef = useRef<number | null>(null);
+  const hasRedirectedRef = useRef(false);
   const [status, setStatus] = useState("Initializing camera…");
   const [similarity, setSimilarity] = useState<number | null>(null);
   const [threshold, setThreshold] = useState<number | null>(null);
@@ -25,17 +26,20 @@ export default function FaceVerifyPage() {
 
   useEffect(() => {
     let active = true;
+
     const init = async () => {
       const { data } = await supabase.auth.getUser();
-      if (!active || !data.user) {
+      if (!active || hasRedirectedRef.current) return;
+      if (!data.user) {
         if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
         redirectTimerRef.current = window.setTimeout(async () => {
-          if (!active) return;
+          if (!active || hasRedirectedRef.current) return;
           const { data: latest } = await supabase.auth.getUser();
           if (!latest.user) {
+            hasRedirectedRef.current = true;
             router.replace("/auth");
           }
-        }, 300);
+        }, 800);
         return;
       }
       try {
@@ -55,10 +59,20 @@ export default function FaceVerifyPage() {
         );
       }
     };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === "SIGNED_IN") {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        void init();
+      }
+    });
+
     void init();
     return () => {
       active = false;
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      authListener.subscription.unsubscribe();
       const tracks = (
         videoRef.current?.srcObject as MediaStream | null
       )?.getTracks();
@@ -161,4 +175,3 @@ export default function FaceVerifyPage() {
     </main>
   );
 }
-
