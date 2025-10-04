@@ -3,7 +3,13 @@ import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
 export async function POST(req: Request) {
   try {
-    const supabase = createServerSupabaseClient();
+    // Extract bearer token from Authorization header
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    let accessToken: string | undefined;
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      accessToken = authHeader.slice(7).trim();
+    }
+    const supabase = createServerSupabaseClient(accessToken);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
 

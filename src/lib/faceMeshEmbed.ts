@@ -28,7 +28,6 @@ async function loadFaceMesh(): Promise<any> {
     const fm = new FaceMeshCtor({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
     fm.setOptions({
       maxNumFaces: 1,
-      refineLandmarks: true,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
     });

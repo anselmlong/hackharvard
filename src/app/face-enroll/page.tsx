@@ -65,16 +65,31 @@ export default function FaceEnrollPage() {
       setStatus('Computing landmarks…');
       const embedding = await computeFaceEmbedding(videoRef.current);
       if (!embedding) {
-        setStatus('No face detected. Try again.');
+        setStatus('Embedding failed. Try again.');
+        setUploading(false);
+        return;
+      }
+      // Retrieve current session to forward access token (needed for server route auth)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setStatus('No active session (401). Please re-login.');
         setUploading(false);
         return;
       }
       setStatus('Uploading vector…');
       const res = await fetch('/api/face/enroll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ vector: embedding.vector })
       });
+      if (res.status === 401) {
+        setStatus('Unauthorized (401). Session expired or missing. Re-login.');
+        setUploading(false);
+        return;
+      }
       const json: EmbeddingResponse = await res.json();
       if (json.success) {
         const dims = json.dimensions ? `${json.dimensions} dims` : '';
