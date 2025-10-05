@@ -1,9 +1,0 @@
-train: /Users/jensen/Projects/test/yolo/splits/train.txt
-val: /Users/jensen/Projects/test/yolo/splits/val.txt
-names:
-  0: no_tongue
-  1: tongue_center
-  2: tongue_down
-  3: tongue_left
-  4: tongue_right
-  5: tongue_up

@@ -1,6 +1,0 @@
-no_tongue
-tongue_center
-tongue_down
-tongue_left
-tongue_right
-tongue_up
