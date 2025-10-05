@@ -139,7 +139,7 @@ export default function CaptchaChallengePage() {
 
         {/* Question */}
         <div className="bg-gray-900 rounded-xl p-8 text-center">
-          <div className="text-2xl font-bold mb-4">{currentQuestion.text}</div>
+          <div className="text-2xl font-bold mb-4">{currentQuestion?.text ?? ""}</div>
           <div className="flex gap-4 justify-center text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full" />
