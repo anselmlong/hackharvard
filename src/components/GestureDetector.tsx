@@ -19,6 +19,9 @@ export function GestureDetector({
   const supabase = supabaseBrowser();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sessionIdRef = useRef<string>(
+    `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  );
 
   const [detection, setDetection] = useState<string>("no_tongue");
   const [confidence, setConfidence] = useState<number>(0);
@@ -79,7 +82,10 @@ export function GestureDetector({
         const res = await fetch("/api/gesture/detect", {
           method: "POST",
           headers,
-          body: JSON.stringify({ image: imageData }),
+          body: JSON.stringify({
+            image: imageData,
+            sessionId: sessionIdRef.current
+          }),
         });
 
         const data = await res.json();

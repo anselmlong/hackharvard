@@ -44,14 +44,14 @@ export async function POST(req: Request) {
     const supabase = createServerSupabaseClient(accessToken);
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Generate session ID (use user ID if authenticated, otherwise random)
-    const sessionId = user?.id ?? `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
     // Parse request
-    const body = await req.json().catch(() => null) as { image?: string } | null;
+    const body = await req.json().catch(() => null) as { image?: string; sessionId?: string } | null;
     if (!body?.image || typeof body.image !== 'string') {
       return NextResponse.json({ error: 'Invalid image' }, { status: 400 });
     }
+
+    // Generate session ID (use user ID if authenticated, otherwise use client-provided sessionId)
+    const sessionId = user?.id ?? body.sessionId ?? `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Call YOLO model
     const response = await fetch(`${MODEL_SERVER_URL}/detect`, {
