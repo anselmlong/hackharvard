@@ -1,0 +1,33 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "no_tongue"
+    },
+    {
+      "id": 1,
+      "name": "tongue_center"
+    },
+    {
+      "id": 2,
+      "name": "tongue_down"
+    },
+    {
+      "id": 3,
+      "name": "tongue_left"
+    },
+    {
+      "id": 4,
+      "name": "tongue_right"
+    },
+    {
+      "id": 5,
+      "name": "tongue_up"
+    }
+  ],
+  "info": {
+    "year": 2025,
+    "version": "1.0",
+    "contributor": "Label Studio"
+  }
+}
