@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
-const BASE_DIM = 1404; // legacy without iris
-const IRIS_DIM = 1434; // with refineLandmarks iris points (+30)
-const EXPECTED_DIM = 1434; // default to 1434 now
+const EXPECTED_DIM = 1404; 
 
 function cosine(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
@@ -72,16 +70,7 @@ export async function POST(req: Request) {
       return vec;
     };
 
-    // Upgrade legacy stored 1404 -> 1434 if expecting IRIS_DIM
-    if (EXPECTED_DIM === IRIS_DIM && storedVec.length === BASE_DIM) {
-      storedVec = padTo(storedVec, IRIS_DIM);
-      upgraded = true;
-    }
-    // Accept incoming legacy 1404 by padding
-    if (EXPECTED_DIM === IRIS_DIM && incomingVec.length === BASE_DIM) {
-      incomingVec = padTo(incomingVec, IRIS_DIM);
-    }
-    
+
     if (storedVec.length !== EXPECTED_DIM || incomingVec.length !== EXPECTED_DIM) {
       return NextResponse.json({
         success: false,
@@ -92,7 +81,7 @@ export async function POST(req: Request) {
         debug: process.env.NODE_ENV !== 'production' ? {
           rawType: parsedStored.rawType,
           rawCharLength: parsedStored.rawCharLength,
-          note: 'Unexpected dimension after adaptation'
+          note: 'Unexpected dimension'
         } : undefined
       }, { status: 400 });
     }
@@ -112,7 +101,7 @@ export async function POST(req: Request) {
   const { vec: incoming, norm: incomingNormFlag } = renorm(incomingVec);
     let similarity = cosine(stored, incoming);
     if (!isFinite(similarity)) similarity = 0;
-    const threshold = 0.7;
+    const threshold = 0.98;
     const match = similarity >= threshold;
     return NextResponse.json({
       success: true,

@@ -43,20 +43,13 @@ export default function FaceEnrollPage() {
         return;
       }
       setUserEmail(data.user.email ?? null);
-      // Include bearer token for status
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       try {
-        const headers: Record<string, string> = session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {};
+        const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const statusRes = await fetch("/api/face/status", { headers });
         const statusJson: { enrolled?: boolean } = await statusRes.json();
         if (statusJson.enrolled) setStatus("Already enrolled");
-      } catch {
-        /* ignore */
-      }
+      } catch {/* ignore */}
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -87,9 +80,7 @@ export default function FaceEnrollPage() {
       active = false;
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       authListener.subscription.unsubscribe();
-      const tracks = (
-        videoRef.current?.srcObject as MediaStream | null
-      )?.getTracks();
+      const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
       tracks?.forEach((t) => t.stop());
     };
   }, [supabase, router]);
@@ -112,23 +103,20 @@ export default function FaceEnrollPage() {
     setUploading(true);
     try {
       setStatus("Computing landmarks (5 frames)…");
-      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 5, refineLandmarks: true });
+      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 5 });
       if (!embedding) {
         setStatus("Embedding failed. Try again.");
         setUploading(false);
         return;
       }
       console.debug('[enroll] embedding length', embedding.vector.length);
-      // Retrieve current session to forward access token (needed for server route auth)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         setStatus("No active session (401). Please re-login.");
         setUploading(false);
         return;
       }
-  setStatus(`Uploading vector (${embedding.vector.length} dims)…`);
+      setStatus(`Uploading vector (${embedding.vector.length} dims)…`);
       const res = await fetch("/api/face/enroll", {
         method: "POST",
         headers: {
@@ -146,9 +134,7 @@ export default function FaceEnrollPage() {
       if (json.success) {
         const dims = json.dimensions ? `${json.dimensions} dims` : "";
         setStatus(`Enrollment complete ${dims && "(" + dims + ")"}`);
-        setTimeout(() => {
-          router.replace("/");
-        }, 1000);
+        setTimeout(() => { router.replace("/"); }, 1000);
       } else {
         setStatus("Failed: " + (json.error || "Unknown error"));
       }

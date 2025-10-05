@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
-const BASE_DIM = 1404; // 468 * 3
-const EXPECTED_DIM = 1434; // used for response meta
+const EXPECTED_DIM = 1404; 
 
 export async function POST(req: Request) {
   try {
@@ -25,8 +24,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Invalid or empty vector' }, { status: 400 });
     }
     // Basic sanity clamp & type normalization
-    const vector = body.vector.map(v => typeof v === 'number' && isFinite(v) ? v : 0);
-    // Optional: re-normalize (L2)
+    let vector = body.vector.map(v => typeof v === 'number' && isFinite(v) ? v : 0);
+    if (vector.length !== EXPECTED_DIM) {
+      return NextResponse.json({ success: false, error: `Unexpected vector length ${vector.length} (expected ${EXPECTED_DIM})`, expectedDim: EXPECTED_DIM }, { status: 400 });
+    }
+
     let norm = Math.sqrt(vector.reduce((a, b) => a + b * b, 0));
     if (!isFinite(norm) || norm === 0) {
       return NextResponse.json({ success: false, error: 'Zero-norm embedding (face not confidently detected)', expectedDim: EXPECTED_DIM }, { status: 400 });
