@@ -195,7 +195,7 @@ export default function Home() {
       </div>
 
       {/* Sign out button */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-50">
         {email && (
           <button
             onClick={signOut}
