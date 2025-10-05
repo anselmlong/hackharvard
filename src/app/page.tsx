@@ -207,8 +207,8 @@ export default function Home() {
       </div>
 
       {/* Main content - centered */}
-      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-8">
-        <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-6xl font-extrabold tracking-tight text-transparent md:text-8xl">
+      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-8 max-w-screen-2xl mx-auto">
+        <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent sm:text-6xl md:text-6xl">
           Welcome to Freak-cha
         </h1>
         {email && <p className="text-sm text-white/50">Signed in as {email}</p>}
