@@ -40,7 +40,7 @@ export const LiveVideoFeed = () => {
 	}, []);
 
 	return (
-		<div className="relative w-full max-w-xl aspect-video rounded-xl overflow-hidden bg-black border border-white/10">
+		<div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-white/10">
 			<video
 				ref={videoRef}
 				playsInline

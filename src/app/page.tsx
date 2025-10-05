@@ -2,8 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LiveVideoFeed } from "./_components/LiveVideoFeed";
+import { GestureDetector } from "~/components/GestureDetector";
 import { supabaseBrowser } from "~/lib/supabaseClient";
+
+interface Emoji {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rotation: number;
+  rotationSpeed: number;
+}
+
+const TONGUE_FACTS = [
+  "The human tongue has about 10,000 taste buds that are replaced every 2 weeks.",
+  "Your tongue is the only muscle in your body attached at only one end.",
+  "The tongue is the strongest muscle in the human body relative to its size.",
+  "Blue whales have tongues that weigh as much as an elephant (about 2,700 kg).",
+  "Tongues have a unique print, just like fingerprints.",
+  "The longest human tongue on record measures 10.1 cm (3.97 inches).",
+  "Dogs use their tongues to regulate body temperature since they can't sweat.",
+  "A chameleon's tongue can be up to twice the length of its body.",
+  "The average tongue is about 3.3 inches long for men and 3.1 inches for women.",
+  "Taste buds can detect five basic tastes: sweet, salty, sour, bitter, and umami.",
+];
 
 export default function Home() {
   const supabase = supabaseBrowser();
@@ -12,6 +35,8 @@ export default function Home() {
   const hasRedirectedRef = useRef(false);
   const [email, setEmail] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [emojis, setEmojis] = useState<Emoji[]>([]);
+  const [currentFact, setCurrentFact] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +94,53 @@ export default function Home() {
     };
   }, [supabase, router]);
 
+  // Initialize and animate emojis
+  useEffect(() => {
+    const initialEmojis: Emoji[] = Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 4,
+    }));
+
+    setEmojis(initialEmojis);
+
+    const interval = setInterval(() => {
+      setEmojis((prev) =>
+        prev.map((emoji) => {
+          let { x, y, vx, vy, rotation, rotationSpeed } = emoji;
+
+          x += vx;
+          y += vy;
+          rotation += rotationSpeed;
+
+          if (x <= 0 || x >= 100) vx *= -1;
+          if (y <= 0 || y >= 100) vy *= -1;
+
+          if (x < 0) x = 0;
+          if (x > 100) x = 100;
+          if (y < 0) y = 0;
+          if (y > 100) y = 100;
+
+          return { ...emoji, x, y, vx, vy, rotation };
+        })
+      );
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Rotate tongue facts
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFact((prev) => (prev + 1) % TONGUE_FACTS.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const signOut = async () => {
     await supabase.auth.signOut();
     router.replace("/auth");
@@ -76,8 +148,24 @@ export default function Home() {
 
   if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        <div className="flex flex-col items-center gap-4">
+      <main className="relative flex min-h-screen items-center justify-center bg-black text-white overflow-hidden">
+        {/* Flying emojis */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          {emojis.map((emoji) => (
+            <div
+              key={emoji.id}
+              className="absolute text-4xl"
+              style={{
+                left: `${emoji.x}%`,
+                top: `${emoji.y}%`,
+                transform: `rotate(${emoji.rotation}deg)`,
+              }}
+            >
+              👅
+            </div>
+          ))}
+        </div>
+        <div className="relative z-10 flex flex-col items-center gap-4">
           <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-white" />
           <p className="text-xs tracking-wide text-white/60">
             Checking session…
@@ -88,9 +176,25 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen w-full flex-col items-center bg-gradient-to-b from-gray-950 via-gray-900 to-black px-4 py-12 text-white">
-      <header className="mb-10 flex w-full max-w-5xl flex-col items-center gap-3 text-center">
-        <div className="mb-2 flex w-full justify-end">
+    <main className="relative flex min-h-screen w-full flex-col items-center bg-gradient-to-b from-gray-950 via-gray-900 to-black px-4 py-12 text-white overflow-hidden">
+      {/* Flying emojis */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        {emojis.map((emoji) => (
+          <div
+            key={emoji.id}
+            className="absolute text-4xl"
+            style={{
+              left: `${emoji.x}%`,
+              top: `${emoji.y}%`,
+              transform: `rotate(${emoji.rotation}deg)`,
+            }}
+          >
+            👅
+          </div>
+        ))}
+      </div>
+      <div className="relative z-10 flex min-h-[80vh] w-full flex-col items-center justify-center">
+        <div className="mb-4 flex w-full max-w-5xl justify-end px-4">
           {email && (
             <button
               onClick={signOut}
@@ -100,49 +204,34 @@ export default function Home() {
             </button>
           )}
         </div>
-        <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent md:text-5xl">
-          Facial Interaction Captcha (Prototype)
-        </h1>
-        {email && <p className="text-xs text-white/50">Signed in as {email}</p>}
-        <p className="max-w-2xl text-sm leading-relaxed text-white/60 md:text-base">
-          Skeleton page: live camera feed only. Security levels & challenges
-          will be added later.
-        </p>
-      </header>
+        <div className="flex flex-col items-center gap-6 text-center px-4">
+          <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-6xl font-extrabold tracking-tight text-transparent md:text-8xl">
+            Welcome to Freak-cha
+          </h1>
+          {email && <p className="text-sm text-white/50">Signed in as {email}</p>}
 
-      <section className="flex w-full max-w-5xl flex-col items-center gap-8">
-        <LiveVideoFeed />
-
-        <div className="grid w-full max-w-xl gap-4 text-xs text-white/50">
-          <div className="rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-            <p className="mb-1 font-semibold text-white/80">
-              Planned Next Layers
-            </p>
-            <ul className="list-inside list-disc space-y-1 marker:text-fuchsia-400">
-              <li>Expression prompts (😃 😗 😉 😧 😬)</li>
-              <li>Tongue True/False gesture capture</li>
-              <li>Adaptive challenge sequencing</li>
-              <li>Real-time overlay & confidence scores</li>
-              <li>Benchmark / endless reasoning mode</li>
-            </ul>
+          {/* Live Video Feed with Detection */}
+          <div className="w-full max-w-2xl">
+            <GestureDetector showDebug />
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-            <p className="mb-1 font-semibold text-white/80">Troubleshooting</p>
-            <ul className="list-inside list-disc space-y-1">
-              <li>
-                If the feed is black: ensure only one tab/app uses the camera.
-              </li>
-              <li>Check site permissions (camera) in the browser bar.</li>
-              <li>Reload after granting access.</li>
-              <li>Incognito windows sometimes block permissions by policy.</li>
-            </ul>
+          {/* Tongue Facts */}
+          <div className="mt-8 w-full max-w-4xl rounded-xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
+            <p className="mb-4 text-base font-semibold uppercase tracking-wide text-fuchsia-400">
+              👅 Tongue Fact
+            </p>
+            <p className="text-xl leading-relaxed text-white/90 transition-all duration-500">
+              {TONGUE_FACTS[currentFact]}
+            </p>
           </div>
         </div>
-      </section>
+      </div>
 
-      <footer className="mt-14 text-[10px] tracking-wide text-white/40">
-        Prototype build — no data stored or transmitted.
+      {/* Credits Footer */}
+      <footer className="relative z-10 pb-8 text-center">
+        <p className="text-xs text-white/40">
+          Created by Anselm • Isa • Jensen • Junjie
+        </p>
       </footer>
     </main>
   );
