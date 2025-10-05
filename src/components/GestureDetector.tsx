@@ -8,6 +8,7 @@ interface GestureDetectorProps {
   onDetection?: (detection: string, confidence: number) => void;
   showDebug?: boolean;
   className?: string;
+  active?: boolean; // Whether detection is active
 }
 
 export function GestureDetector({
@@ -15,6 +16,7 @@ export function GestureDetector({
   onDetection,
   showDebug = false,
   className = "",
+  active = true,
 }: GestureDetectorProps) {
   const supabase = supabaseBrowser();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -49,6 +51,7 @@ export function GestureDetector({
   // Detection loop
   useEffect(() => {
     const detect = async () => {
+      if (!active) return; // Don't detect if not active
       if (!videoRef.current || !canvasRef.current) return;
 
       const canvas = canvasRef.current;
@@ -109,7 +112,7 @@ export function GestureDetector({
 
     const interval = setInterval(detect, 100);
     return () => clearInterval(interval);
-  }, [supabase, onGesture, onDetection]);
+  }, [supabase, onGesture, onDetection, active]);
 
   return (
     <div className={className}>

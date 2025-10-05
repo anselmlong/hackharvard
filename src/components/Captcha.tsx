@@ -51,6 +51,7 @@ export function Captcha({
   const [animateIn, setAnimateIn] = useState(false);
   const [lastDetection, setLastDetection] = useState<string>("no_tongue");
   const [lastConfidence, setLastConfidence] = useState<number>(0);
+  const [detectionActive, setDetectionActive] = useState(false);
 
   // Pick random questions when dialog opens
   useEffect(() => {
@@ -60,6 +61,19 @@ export function Captcha({
       setCurrentIndex(0);
     }
   }, [dialogOpen, questions.length, questionCount]);
+
+  // Wait 2 seconds before starting detection
+  useEffect(() => {
+    if (dialogOpen) {
+      setDetectionActive(false);
+      const timer = setTimeout(() => {
+        setDetectionActive(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setDetectionActive(false);
+    }
+  }, [dialogOpen]);
 
   const handleClick = () => {
     setState("checking");
@@ -100,6 +114,7 @@ export function Captcha({
     if (isCorrect) {
       setFeedback("correct");
       setLiveMessage("Correct answer");
+      setDetectionActive(false); // Stop detection
 
       // Clear buffer (public mode doesn't need auth)
       // Note: Session will auto-expire after 5 minutes
@@ -116,17 +131,26 @@ export function Captcha({
           setCurrentIndex(currentIndex + 1);
           setFeedback(null);
           setLiveMessage(`Question ${currentIndex + 2} of ${questions.length}`);
+          // Wait 0.5s before restarting detection
+          setTimeout(() => {
+            setDetectionActive(true);
+          }, 500);
         }
       }, 1000);
     } else {
       setFeedback("wrong");
       setLiveMessage("Incorrect answer. Try again.");
+      setDetectionActive(false); // Stop detection
 
       // Clear buffer (public mode doesn't need auth)
       // Note: Session will auto-expire after 5 minutes
 
       setTimeout(() => {
         setFeedback(null);
+        // Wait 0.5s before restarting detection
+        setTimeout(() => {
+          setDetectionActive(true);
+        }, 500);
       }, 1500);
     }
   };
@@ -314,6 +338,7 @@ export function Captcha({
                       setLastConfidence(c);
                     }}
                     showDebug={false}
+                    active={detectionActive}
                   />
                 </div>
               </div>
@@ -348,13 +373,13 @@ export function Captcha({
                 <div>
                   <span className="text-gray-400">Detection: </span>
                   <span className="font-mono text-green-400">
-                    {lastDetection}
+                    {detectionActive ? lastDetection : "Warming up..."}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-400">Confidence: </span>
                   <span className="font-mono">
-                    {(lastConfidence * 100).toFixed(1)}%
+                    {detectionActive ? `${(lastConfidence * 100).toFixed(1)}%` : "..."}
                   </span>
                 </div>
               </div>
