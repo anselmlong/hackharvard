@@ -24,7 +24,7 @@ const QUESTION_BANK: Question[] = [
   { text: "You can put metal in a microwave.", answer: "no" },
   { text: "One kilogram of feathers weighs more than one kilogram of steel.", answer: "no" },
   { text: "You can survive a hackathon without caffeine.", answer: "no" },
-  { text: "There are 3 'r's in strawberry.", answer: "no" },
+  { text: "There are 3 'r's in strawberry.", answer: "yes" },
 ];
 
 export default function CaptchaChallengePage() {
