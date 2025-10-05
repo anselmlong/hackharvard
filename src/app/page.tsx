@@ -176,7 +176,7 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex min-h-screen w-full flex-col items-center bg-gradient-to-b from-gray-950 via-gray-900 to-black px-4 py-12 text-white overflow-hidden">
+    <main className="relative flex h-screen w-full flex-col items-center bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white overflow-hidden">
       {/* Flying emojis */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {emojis.map((emoji) => (
@@ -193,46 +193,46 @@ export default function Home() {
           </div>
         ))}
       </div>
-      <div className="relative z-10 flex min-h-[80vh] w-full flex-col items-center justify-center">
-        <div className="mb-4 flex w-full max-w-5xl justify-end px-4">
-          {email && (
-            <button
-              onClick={signOut}
-              className="rounded border border-white/10 bg-white/10 px-3 py-1 text-xs transition hover:bg-white/20"
-            >
-              Sign out
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col items-center gap-6 text-center px-4">
-          <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-6xl font-extrabold tracking-tight text-transparent md:text-8xl">
-            Welcome to Freak-cha
-          </h1>
-          {email && <p className="text-sm text-white/50">Signed in as {email}</p>}
 
-          {/* Live Video Feed with Detection */}
-          <div className="w-full max-w-2xl">
-            <GestureDetector showDebug />
-          </div>
-
-          {/* Tongue Facts */}
-          <div className="mt-8 w-full max-w-4xl rounded-xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
-            <p className="mb-4 text-base font-semibold uppercase tracking-wide text-fuchsia-400">
-              👅 Tongue Fact
-            </p>
-            <p className="text-xl leading-relaxed text-white/90 transition-all duration-500">
-              {TONGUE_FACTS[currentFact]}
-            </p>
-          </div>
-        </div>
+      {/* Sign out button */}
+      <div className="absolute top-4 right-4 z-10">
+        {email && (
+          <button
+            onClick={signOut}
+            className="rounded border border-white/10 bg-white/10 px-3 py-1 text-xs transition hover:bg-white/20"
+          >
+            Sign out
+          </button>
+        )}
       </div>
 
-      {/* Credits Footer */}
-      <footer className="relative z-10 pb-8 text-center">
-        <p className="text-xs text-white/40">
+      {/* Main content - centered */}
+      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-8">
+        <h1 className="bg-gradient-to-r from-fuchsia-400 via-violet-300 to-sky-300 bg-clip-text text-6xl font-extrabold tracking-tight text-transparent md:text-8xl">
+          Welcome to Freak-cha
+        </h1>
+        {email && <p className="text-sm text-white/50">Signed in as {email}</p>}
+
+        {/* Live Video Feed with Detection */}
+        <div className="w-full max-w-3xl">
+          <GestureDetector showDebug />
+        </div>
+
+        {/* Tongue Facts */}
+        <div className="w-full max-w-4xl rounded-xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
+          <p className="mb-3 text-base font-semibold uppercase tracking-wide text-fuchsia-400">
+            👅 Tongue Fact
+          </p>
+          <p className="text-xl leading-relaxed text-white/90 transition-all duration-500">
+            {TONGUE_FACTS[currentFact]}
+          </p>
+        </div>
+
+        {/* Credits */}
+        <p className="mt-2 text-sm text-white/40">
           Created by Anselm • Isa • Jensen • Junjie
         </p>
-      </footer>
+      </div>
     </main>
   );
 }
