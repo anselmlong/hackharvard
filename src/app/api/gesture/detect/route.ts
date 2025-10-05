@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
 const MODEL_SERVER_URL = process.env.MODEL_SERVER_URL || 'http://localhost:8000';
-const BUFFER_SIZE = 20; // Number of detections to analyze
-const STATIC_THRESHOLD = 0.8; // 80% same position = holding
-const BALANCED_THRESHOLD = 0.35; // 35/65 split = movement
+const BUFFER_SIZE = 10; // Number of detections to analyze
+const STATIC_THRESHOLD = 0.6; // 60% same position = holding
+const MOVEMENT_THRESHOLD = 0.5; // 50% combined positions = movement
 
 // In-memory session storage
 interface DetectionFrame {
@@ -167,7 +167,7 @@ function analyzeGesture(buffer: DetectionFrame[]): {
   const upPct = distribution['tongue_up'] || 0;
   const downPct = distribution['tongue_down'] || 0;
 
-  // STATIC GESTURES (one position dominates)
+  // STATIC GESTURES (one position dominates - 60%+ same position)
   if (leftPct > STATIC_THRESHOLD) {
     return { gesture: 'hold_left', confidence: leftPct, distribution };
   }
@@ -181,49 +181,21 @@ function analyzeGesture(buffer: DetectionFrame[]): {
     return { gesture: 'hold_down', confidence: downPct, distribution };
   }
 
-  // HORIZONTAL MOVEMENT (left ↔ right)
+  // AGGRESSIVE HORIZONTAL MOVEMENT (rapid left <-> right)
   const horizontalTotal = leftPct + rightPct;
-  if (horizontalTotal > 0.7) {
-    const balance = Math.min(leftPct, rightPct) / Math.max(leftPct, rightPct);
-    if (balance > BALANCED_THRESHOLD) {
-      // Check sequence for direction
-      const sequence = getSequence(buffer);
-      const firstH = sequence.find(d => d === 'tongue_left' || d === 'tongue_right');
-      const lastH = [...sequence].reverse().find(d => d === 'tongue_left' || d === 'tongue_right');
-
-      if (firstH === 'tongue_left' && lastH === 'tongue_right') {
-        return { gesture: 'swipe_left_right', confidence: balance, distribution };
-      }
-      if (firstH === 'tongue_right' && lastH === 'tongue_left') {
-        return { gesture: 'swipe_right_left', confidence: balance, distribution };
-      }
-
-      // Rapid alternation = shake
-      if (isRapidAlternation(sequence, ['tongue_left', 'tongue_right'])) {
-        return { gesture: 'shake_horizontal', confidence: balance, distribution };
-      }
+  if (horizontalTotal > MOVEMENT_THRESHOLD) {
+    const sequence = getSequence(buffer);
+    if (isRapidAlternation(sequence, ['tongue_left', 'tongue_right'])) {
+      return { gesture: 'shake_horizontal', confidence: horizontalTotal, distribution };
     }
   }
 
-  // VERTICAL MOVEMENT (up ↔ down)
+  // AGGRESSIVE VERTICAL MOVEMENT (rapid up <-> down)
   const verticalTotal = upPct + downPct;
-  if (verticalTotal > 0.7) {
-    const balance = Math.min(upPct, downPct) / Math.max(upPct, downPct);
-    if (balance > BALANCED_THRESHOLD) {
-      const sequence = getSequence(buffer);
-      const firstV = sequence.find(d => d === 'tongue_up' || d === 'tongue_down');
-      const lastV = [...sequence].reverse().find(d => d === 'tongue_up' || d === 'tongue_down');
-
-      if (firstV === 'tongue_up' && lastV === 'tongue_down') {
-        return { gesture: 'flick_up_down', confidence: balance, distribution };
-      }
-      if (firstV === 'tongue_down' && lastV === 'tongue_up') {
-        return { gesture: 'flick_down_up', confidence: balance, distribution };
-      }
-
-      if (isRapidAlternation(sequence, ['tongue_up', 'tongue_down'])) {
-        return { gesture: 'shake_vertical', confidence: balance, distribution };
-      }
+  if (verticalTotal > MOVEMENT_THRESHOLD) {
+    const sequence = getSequence(buffer);
+    if (isRapidAlternation(sequence, ['tongue_up', 'tongue_down'])) {
+      return { gesture: 'shake_vertical', confidence: verticalTotal, distribution };
     }
   }
 
