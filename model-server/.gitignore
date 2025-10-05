@@ -9,3 +9,7 @@ venv/
 *.pth
 models/*.pt
 models/*.pth
+
+# Allow YOLO weights inside yolo/ to be tracked
+!yolo/**/*.pt
+!yolo/**/*.pth
