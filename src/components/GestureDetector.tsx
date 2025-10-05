@@ -121,7 +121,7 @@ export function GestureDetector({
           </div>
           <div>
             <span className="text-gray-400">Buffer: </span>
-            <span className="font-mono">{bufferSize}/10</span>
+            <span className="font-mono">{bufferSize}/15</span>
           </div>
         </div>
       )}

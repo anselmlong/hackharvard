@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "~/lib/supabaseClient";
+import { Captcha } from "~/components/Captcha";
 
 export default function AuthPage() {
   const supabase = supabaseBrowser();
@@ -11,54 +12,56 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   // If already authenticated, decide where to go immediately
   const router = useRouter();
   const redirectTimerRef = useRef<number | null>(null);
   const hasRedirectedRef = useRef(false);
-  useEffect(() => {
-    let active = true;
-    const run = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!active) return;
-      if (!data.user) return;
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-      redirectTimerRef.current = window.setTimeout(async () => {
-        if (!active) return;
-        const { data: latest } = await supabase.auth.getUser();
-        if (!latest.user || hasRedirectedRef.current) return;
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const headers: Record<string, string> = session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {};
-          const statusRes = await fetch("/api/face/status", { headers });
-          const statusJson = (await statusRes.json()) as { enrolled?: boolean };
-          hasRedirectedRef.current = true;
-          router.replace(statusJson.enrolled ? "/face-verify" : "/face-enroll");
-        } catch {
-          /* ignore */
-        }
-      }, 300);
-    };
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (!active) return;
-      if (event === "SIGNED_IN") {
-        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-        hasRedirectedRef.current = false;
-        void run();
-      }
-    });
+  // useEffect(() => {
+  //   let active = true;
+  //   const run = async () => {
+  //     const { data } = await supabase.auth.getUser();
+  //     if (!active) return;
+  //     if (!data.user) return;
+  //     if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  //     redirectTimerRef.current = window.setTimeout(async () => {
+  //       if (!active) return;
+  //       const { data: latest } = await supabase.auth.getUser();
+  //       if (!latest.user || hasRedirectedRef.current) return;
+  //       try {
+  //         const {
+  //           data: { session },
+  //         } = await supabase.auth.getSession();
+  //         const headers: Record<string, string> = session?.access_token
+  //           ? { Authorization: `Bearer ${session.access_token}` }
+  //           : {};
+  //         const statusRes = await fetch("/api/face/status", { headers });
+  //         const statusJson = (await statusRes.json()) as { enrolled?: boolean };
+  //         hasRedirectedRef.current = true;
+  //         router.replace(statusJson.enrolled ? "/face-verify" : "/face-enroll");
+  //       } catch {
+  //         /* ignore */
+  //       }
+  //     }, 300);
+  //   };
+  //   const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+  //     if (!active) return;
+  //     if (event === "SIGNED_IN") {
+  //       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  //       hasRedirectedRef.current = false;
+  //       void run();
+  //     }
+  //   });
 
-    void run();
-    return () => {
-      active = false;
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase, router]);
+  //   void run();
+  //   return () => {
+  //     active = false;
+  //     if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  //     authListener.subscription.unsubscribe();
+  //   };
+  // }, [supabase, router]);
 
   const postAuthRedirect = async () => {
     const {
@@ -167,29 +170,47 @@ export default function AuthPage() {
               {message}
             </div>
           )}
+          <div className="flex justify-center pt-2">
+            <Captcha
+              key={captchaKey}
+              onSuccess={() => setCaptchaVerified(true)}
+              onError={(error) => console.error(error)}
+              failurePercentage={100}
+            />
+          </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !captchaVerified}
             className="w-full rounded-md bg-fuchsia-600 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? "Please wait..."
-              : mode === "signup"
-                ? "Sign Up"
-                : "Sign In"}
+              : !captchaVerified
+                ? "Complete CAPTCHA first"
+                : mode === "signup"
+                  ? "Sign Up"
+                  : "Sign In"}
           </button>
         </form>
         <div className="text-center text-[11px] text-white/50">
           {mode === "signup" ? (
             <button
-              onClick={() => setMode("signin")}
+              onClick={() => {
+                setMode("signin");
+                setCaptchaVerified(false);
+                setCaptchaKey((prev) => prev + 1);
+              }}
               className="text-fuchsia-400 hover:underline"
             >
               Already have an account? Sign in
             </button>
           ) : (
             <button
-              onClick={() => setMode("signup")}
+              onClick={() => {
+                setMode("signup");
+                setCaptchaVerified(false);
+                setCaptchaKey((prev) => prev + 1);
+              }}
               className="text-fuchsia-400 hover:underline"
             >
               Need an account? Create one

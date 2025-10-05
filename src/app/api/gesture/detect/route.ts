@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
 const MODEL_SERVER_URL = process.env.MODEL_SERVER_URL || 'http://localhost:8000';
-const BUFFER_SIZE = 10; // Number of detections to analyze
-const STATIC_THRESHOLD = 0.6; // 60% same position = holding
-const MOVEMENT_THRESHOLD = 0.5; // 50% combined positions = movement
+const BUFFER_SIZE = 15; // Number of detections to analyze (1.5 seconds)
+const STATIC_THRESHOLD = 0.5; // 50% same position = holding (excluding center)
+const MOVEMENT_THRESHOLD = 0.4; // 40% combined positions = movement
+const MIN_ALTERNATIONS = 2; // Minimum switches for shake gesture
 
 // In-memory session storage
 interface DetectionFrame {
@@ -166,36 +167,51 @@ function analyzeGesture(buffer: DetectionFrame[]): {
   const rightPct = distribution['tongue_right'] || 0;
   const upPct = distribution['tongue_up'] || 0;
   const downPct = distribution['tongue_down'] || 0;
+  const centerPct = distribution['tongue_center'] || 0;
 
-  // STATIC GESTURES (one position dominates - 60%+ same position)
-  if (leftPct > STATIC_THRESHOLD) {
-    return { gesture: 'hold_left', confidence: leftPct, distribution };
+  // Calculate percentages excluding center/no_tongue for better detection
+  const activeTotal = leftPct + rightPct + upPct + downPct;
+
+  // Only analyze if we have enough active tongue detections (not just center)
+  if (activeTotal < 0.3) {
+    return { gesture: null, confidence: 0, distribution };
   }
-  if (rightPct > STATIC_THRESHOLD) {
-    return { gesture: 'hold_right', confidence: rightPct, distribution };
+
+  // Normalize percentages relative to active detections
+  const leftNorm = activeTotal > 0 ? leftPct / activeTotal : 0;
+  const rightNorm = activeTotal > 0 ? rightPct / activeTotal : 0;
+  const upNorm = activeTotal > 0 ? upPct / activeTotal : 0;
+  const downNorm = activeTotal > 0 ? downPct / activeTotal : 0;
+
+  // STATIC GESTURES (one position dominates - 50%+ of active detections)
+  if (leftNorm > STATIC_THRESHOLD) {
+    return { gesture: 'hold_left', confidence: leftNorm, distribution };
   }
-  if (upPct > STATIC_THRESHOLD) {
-    return { gesture: 'hold_up', confidence: upPct, distribution };
+  if (rightNorm > STATIC_THRESHOLD) {
+    return { gesture: 'hold_right', confidence: rightNorm, distribution };
   }
-  if (downPct > STATIC_THRESHOLD) {
-    return { gesture: 'hold_down', confidence: downPct, distribution };
+  if (upNorm > STATIC_THRESHOLD) {
+    return { gesture: 'hold_up', confidence: upNorm, distribution };
+  }
+  if (downNorm > STATIC_THRESHOLD) {
+    return { gesture: 'hold_down', confidence: downNorm, distribution };
   }
 
   // AGGRESSIVE HORIZONTAL MOVEMENT (rapid left <-> right)
-  const horizontalTotal = leftPct + rightPct;
-  if (horizontalTotal > MOVEMENT_THRESHOLD) {
+  const horizontalNorm = leftNorm + rightNorm;
+  if (horizontalNorm > 0.7 && leftNorm > 0.2 && rightNorm > 0.2) {
     const sequence = getSequence(buffer);
     if (isRapidAlternation(sequence, ['tongue_left', 'tongue_right'])) {
-      return { gesture: 'shake_horizontal', confidence: horizontalTotal, distribution };
+      return { gesture: 'shake_horizontal', confidence: horizontalNorm, distribution };
     }
   }
 
   // AGGRESSIVE VERTICAL MOVEMENT (rapid up <-> down)
-  const verticalTotal = upPct + downPct;
-  if (verticalTotal > MOVEMENT_THRESHOLD) {
+  const verticalNorm = upNorm + downNorm;
+  if (verticalNorm > 0.7 && upNorm > 0.2 && downNorm > 0.2) {
     const sequence = getSequence(buffer);
     if (isRapidAlternation(sequence, ['tongue_up', 'tongue_down'])) {
-      return { gesture: 'shake_vertical', confidence: verticalTotal, distribution };
+      return { gesture: 'shake_vertical', confidence: verticalNorm, distribution };
     }
   }
 
@@ -218,11 +234,14 @@ function getSequence(buffer: DetectionFrame[]): string[] {
 function isRapidAlternation(sequence: string[], positions: string[]): boolean {
   let alternations = 0;
   for (let i = 1; i < sequence.length; i++) {
-    if (positions.includes(sequence[i]) &&
-        positions.includes(sequence[i - 1]) &&
-        sequence[i] !== sequence[i - 1]) {
+    const current = sequence[i];
+    const previous = sequence[i - 1];
+    if (current && previous &&
+        positions.includes(current) &&
+        positions.includes(previous) &&
+        current !== previous) {
       alternations++;
     }
   }
-  return alternations >= 3;
+  return alternations >= MIN_ALTERNATIONS;
 }
