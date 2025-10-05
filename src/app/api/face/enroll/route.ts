@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
+const BASE_DIM = 1404; // 468 * 3
+const EXPECTED_DIM = 1434; // used for response meta
+
 export async function POST(req: Request) {
   try {
     // Extract bearer token from Authorization header
@@ -24,7 +27,10 @@ export async function POST(req: Request) {
     // Basic sanity clamp & type normalization
     const vector = body.vector.map(v => typeof v === 'number' && isFinite(v) ? v : 0);
     // Optional: re-normalize (L2)
-    const norm = Math.sqrt(vector.reduce((a, b) => a + b * b, 0)) || 1;
+    let norm = Math.sqrt(vector.reduce((a, b) => a + b * b, 0));
+    if (!isFinite(norm) || norm === 0) {
+      return NextResponse.json({ success: false, error: 'Zero-norm embedding (face not confidently detected)', expectedDim: EXPECTED_DIM }, { status: 400 });
+    }
     for (let i = 0; i < vector.length; i++) vector[i] = (vector[i] ?? 0) / norm;
 
     // Store vector in a table (placeholder): ensure a table `face_vectors (user_id uuid primary key, embedding jsonb)` exists.
@@ -35,7 +41,7 @@ export async function POST(req: Request) {
     if (upsertError) {
       return NextResponse.json({ success: false, error: upsertError.message }, { status: 500 });
     }
-  return NextResponse.json({ success: true, userId: rows?.[0]?.id, dimensions: vector.length });
+  return NextResponse.json({ success: true, userId: rows?.[0]?.id, dimensions: vector.length, norm: 1, expectedDim: EXPECTED_DIM });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }

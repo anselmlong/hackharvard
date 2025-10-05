@@ -83,14 +83,15 @@ export default function FaceVerifyPage() {
   const verify = async () => {
     if (!videoRef.current) return;
     setLoading(true);
-    setStatus("Capturing & embedding…");
+  setStatus("Capturing & embedding (3 frames)…");
     try {
-      const embedding = await computeFaceEmbedding(videoRef.current);
+      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 3, refineLandmarks: true });
       if (!embedding) {
         setStatus("No face detected. Try again.");
         setLoading(false);
         return;
       }
+      console.debug('[verify] embedding length', embedding.vector.length);
       const {
         data: { session },
       } = await supabase.auth.getSession();

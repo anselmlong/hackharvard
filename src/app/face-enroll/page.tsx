@@ -111,13 +111,14 @@ export default function FaceEnrollPage() {
     if (!videoRef.current) return;
     setUploading(true);
     try {
-      setStatus("Computing landmarks…");
-      const embedding = await computeFaceEmbedding(videoRef.current);
+      setStatus("Computing landmarks (5 frames)…");
+      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 5, refineLandmarks: true });
       if (!embedding) {
         setStatus("Embedding failed. Try again.");
         setUploading(false);
         return;
       }
+      console.debug('[enroll] embedding length', embedding.vector.length);
       // Retrieve current session to forward access token (needed for server route auth)
       const {
         data: { session },
@@ -127,7 +128,7 @@ export default function FaceEnrollPage() {
         setUploading(false);
         return;
       }
-      setStatus("Uploading vector…");
+  setStatus(`Uploading vector (${embedding.vector.length} dims)…`);
       const res = await fetch("/api/face/enroll", {
         method: "POST",
         headers: {
