@@ -101,16 +101,8 @@ export function Captcha({
       setFeedback("correct");
       setLiveMessage("Correct answer");
 
-      // Clear buffer
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        await fetch("/api/gesture/detect", {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-      }
+      // Clear buffer (public mode doesn't need auth)
+      // Note: Session will auto-expire after 5 minutes
 
       // Move to next question or complete
       setTimeout(() => {
@@ -130,16 +122,8 @@ export function Captcha({
       setFeedback("wrong");
       setLiveMessage("Incorrect answer. Try again.");
 
-      // Clear buffer
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        await fetch("/api/gesture/detect", {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-      }
+      // Clear buffer (public mode doesn't need auth)
+      // Note: Session will auto-expire after 5 minutes
 
       setTimeout(() => {
         setFeedback(null);

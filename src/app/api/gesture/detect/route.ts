@@ -34,7 +34,7 @@ setInterval(() => {
 
 export async function POST(req: Request) {
   try {
-    // Auth check (same pattern as existing routes)
+    // Auth check (optional for captcha usage)
     const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
     let accessToken: string | undefined;
     if (authHeader?.toLowerCase().startsWith('bearer ')) {
@@ -44,9 +44,8 @@ export async function POST(req: Request) {
     const supabase = createServerSupabaseClient(accessToken);
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    }
+    // Generate session ID (use user ID if authenticated, otherwise random)
+    const sessionId = user?.id ?? `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Parse request
     const body = await req.json().catch(() => null) as { image?: string } | null;
@@ -68,14 +67,14 @@ export async function POST(req: Request) {
     const result = await response.json();
 
     // Get or create user session
-    let session = sessions.get(user.id);
+    let session = sessions.get(sessionId);
     if (!session) {
       session = {
-        userId: user.id,
+        userId: sessionId,
         buffer: [],
         startTime: Date.now()
       };
-      sessions.set(user.id, session);
+      sessions.set(sessionId, session);
     }
 
     // Add detection to buffer
@@ -132,11 +131,12 @@ export async function DELETE(req: Request) {
     const supabase = createServerSupabaseClient(accessToken);
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    }
+    // Generate session ID (use user ID if authenticated, otherwise can't delete)
+    const sessionId = user?.id;
 
-    sessions.delete(user.id);
+    if (sessionId) {
+      sessions.delete(sessionId);
+    }
 
     return NextResponse.json({ success: true, message: 'Buffer cleared' });
   } catch (e) {
