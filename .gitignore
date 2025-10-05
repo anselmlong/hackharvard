@@ -45,4 +45,6 @@ yarn-error.log*
 # idea files
 .idea
 
-/yolo
+yolo/images
+yolo/labels
+yolo/runs
