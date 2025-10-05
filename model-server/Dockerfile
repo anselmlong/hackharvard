@@ -16,6 +16,9 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy YOLO weights and artifacts explicitly (helps caching when code changes)
+COPY yolo/ ./yolo/
+
 # Copy the server source
 COPY . .
 
