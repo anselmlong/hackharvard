@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../../lib/supabaseServer';
 
-const BASE_DIM = 1404; // 468 * 3
-const EXPECTED_DIM = 1434; // used for response meta
+// We now use FaceNet embeddings (512 dims) produced by external model server (/face/embed)
+const FACENET_DIM = 512;
+const MODEL_SERVER_URL = process.env.MODEL_SERVER_URL || 'http://localhost:8000';
 
 export async function POST(req: Request) {
   try {
@@ -16,22 +17,34 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
 
-  const contentType = req.headers.get('content-type') ?? '';
+    const contentType = req.headers.get('content-type') ?? '';
     if (!contentType.includes('application/json')) {
-      return NextResponse.json({ success: false, error: 'Expected application/json with { vector:number[] }' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Expected application/json with { image: base64 }' }, { status: 400 });
     }
-  const body = await req.json().catch(() => null) as unknown as { vector?: number[] } | null;
-    if (!body?.vector || !Array.isArray(body.vector) || body.vector.length === 0) {
-      return NextResponse.json({ success: false, error: 'Invalid or empty vector' }, { status: 400 });
+    const body = await req.json().catch(() => null) as { image?: string } | null;
+    if (!body?.image) {
+      return NextResponse.json({ success: false, error: 'Missing image' }, { status: 400 });
     }
-    // Basic sanity clamp & type normalization
-    const vector = body.vector.map(v => typeof v === 'number' && isFinite(v) ? v : 0);
-    // Optional: re-normalize (L2)
-    let norm = Math.sqrt(vector.reduce((a, b) => a + b * b, 0));
-    if (!isFinite(norm) || norm === 0) {
-      return NextResponse.json({ success: false, error: 'Zero-norm embedding (face not confidently detected)', expectedDim: EXPECTED_DIM }, { status: 400 });
+
+    // Forward to model server for embedding
+    let embedResp: Response;
+    try {
+      embedResp = await fetch(`${MODEL_SERVER_URL}/face/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: body.image })
+      });
+    } catch (err) {
+      return NextResponse.json({ success: false, error: 'Model server unreachable', detail: (err as Error).message }, { status: 502 });
     }
-    for (let i = 0; i < vector.length; i++) vector[i] = (vector[i] ?? 0) / norm;
+    const embedJson = await embedResp.json().catch(()=>null) as { embedding?: number[]; error?: string; dimension?: number } | null;
+    if (!embedResp.ok || !embedJson || embedJson.error) {
+      return NextResponse.json({ success: false, error: embedJson?.error || 'Embedding failed (model server)' }, { status: 500 });
+    }
+    const vector = (embedJson.embedding || []).map(v => typeof v === 'number' && isFinite(v) ? v : 0);
+    if (vector.length !== FACENET_DIM) {
+      return NextResponse.json({ success: false, error: 'Unexpected embedding dimension', got: vector.length, expected: FACENET_DIM }, { status: 500 });
+    }
 
     // Store vector in a table (placeholder): ensure a table `face_vectors (user_id uuid primary key, embedding jsonb)` exists.
     const { data: rows, error: upsertError } = await supabase
@@ -41,7 +54,7 @@ export async function POST(req: Request) {
     if (upsertError) {
       return NextResponse.json({ success: false, error: upsertError.message }, { status: 500 });
     }
-  return NextResponse.json({ success: true, userId: rows?.[0]?.id, dimensions: vector.length, norm: 1, expectedDim: EXPECTED_DIM });
+    return NextResponse.json({ success: true, userId: rows?.[0]?.id, dimensions: vector.length });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }

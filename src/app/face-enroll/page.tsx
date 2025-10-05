@@ -2,14 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "~/lib/supabaseClient";
-import { computeFaceEmbedding } from "~/lib/faceMeshEmbed";
 
 interface EmbeddingResponse {
   success: boolean;
-  vectorId?: string;
-  error?: string;
   dimensions?: number;
-  userId?: string;
+  error?: string;
 }
 
 export default function FaceEnrollPage() {
@@ -43,7 +40,6 @@ export default function FaceEnrollPage() {
         return;
       }
       setUserEmail(data.user.email ?? null);
-      // Include bearer token for status
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -55,7 +51,7 @@ export default function FaceEnrollPage() {
         const statusJson: { enrolled?: boolean } = await statusRes.json();
         if (statusJson.enrolled) setStatus("Already enrolled");
       } catch {
-        /* ignore */
+        /* ignore status fetch */
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -81,7 +77,6 @@ export default function FaceEnrollPage() {
         void setup();
       }
     });
-
     void setup();
     return () => {
       active = false;
@@ -95,31 +90,33 @@ export default function FaceEnrollPage() {
   }, [supabase, router]);
 
   const capture = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current) return;
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const canvas = canvasRef.current ?? document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/png");
+    // Mirror horizontally to match preview
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
     setCapturedDataUrl(dataUrl);
+    setStatus("Captured image");
   };
 
   const upload = async () => {
     if (!videoRef.current) return;
     setUploading(true);
     try {
-      setStatus("Computing landmarks (5 frames)…");
-      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 5, refineLandmarks: true });
-      if (!embedding) {
-        setStatus("Embedding failed. Try again.");
+      if (!capturedDataUrl) {
+        setStatus("Please capture an image first.");
         setUploading(false);
         return;
       }
-      console.debug('[enroll] embedding length', embedding.vector.length);
-      // Retrieve current session to forward access token (needed for server route auth)
+      setStatus("Requesting embedding…");
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -128,14 +125,13 @@ export default function FaceEnrollPage() {
         setUploading(false);
         return;
       }
-  setStatus(`Uploading vector (${embedding.vector.length} dims)…`);
       const res = await fetch("/api/face/enroll", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ vector: embedding.vector }),
+        body: JSON.stringify({ image: capturedDataUrl }),
       });
       if (res.status === 401) {
         setStatus("Unauthorized (401). Session expired or missing. Re-login.");
@@ -236,9 +232,7 @@ export default function FaceEnrollPage() {
               {uploading ? "Processing…" : "Detect & Embed"}
             </button>
             <p className="text-[11px] text-white/40">
-              We will convert this image to a face embedding vector
-              (placeholder). Later: integrate real model & vector DB (Pinecone /
-              Supabase Vector / Weaviate).
+              This image will be sent to the model server (FaceNet) to produce a 512‑dim embedding stored for verification.
             </p>
           </div>
         </section>

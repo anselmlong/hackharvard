@@ -4,3 +4,7 @@ ultralytics
 opencv-python
 numpy
 python-multipart
+facenet-pytorch
+torch
+torchvision
+torchaudio

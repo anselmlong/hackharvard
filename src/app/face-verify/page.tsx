@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "~/lib/supabaseClient";
-import { computeFaceEmbedding } from "~/lib/faceMeshEmbed";
+// Legacy computeFaceEmbedding removed; we now send a captured frame to backend FaceNet server.
 
 interface VerifyResponse {
   success: boolean;
@@ -23,6 +23,7 @@ export default function FaceVerifyPage() {
   const [threshold, setThreshold] = useState<number | null>(null);
   const [match, setMatch] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -83,50 +84,52 @@ export default function FaceVerifyPage() {
   const verify = async () => {
     if (!videoRef.current) return;
     setLoading(true);
-  setStatus("Capturing & embedding (3 frames)…");
+    setStatus("Capturing frame…");
     try {
-      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 3, refineLandmarks: true });
-      if (!embedding) {
-        setStatus("No face detected. Try again.");
+      // Capture a single frame to a canvas (mirroring to match enrollment)
+      const video = videoRef.current;
+      const canvas = canvasRef.current ?? document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setStatus('Canvas error');
         setLoading(false);
         return;
       }
-      console.debug('[verify] embedding length', embedding.vector.length);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      ctx.save();
+      ctx.scale(-1,1);
+      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.restore();
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setStatus("Session missing. Re-login.");
+        setStatus('Session missing. Re-login.');
         setLoading(false);
         return;
       }
-      setStatus("Verifying…");
-      const res = await fetch("/api/face/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ vector: embedding.vector }),
+      setStatus('Verifying…');
+      const res = await fetch('/api/face/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ image: dataUrl })
       });
       const json: VerifyResponse = await res.json();
       if (!json.success) {
-        setStatus("Error: " + (json.error || "unknown"));
+        setStatus('Error: ' + (json.error || 'unknown'));
       } else {
         setMatch(json.match ?? null);
         setSimilarity(json.similarity ?? null);
         setThreshold(json.threshold ?? null);
         if (json.match) {
-          setStatus("Match confirmed. Redirecting…");
-          setTimeout(() => {
-            router.replace("/");
-          }, 800);
+          setStatus('Match confirmed. Redirecting…');
+          setTimeout(()=>{ router.replace('/'); }, 800);
         } else {
-          setStatus("Face did not match. Try again.");
+          setStatus('Face did not match. Try again.');
         }
       }
     } catch (_e) {
-      setStatus("Verify error");
+      setStatus('Verify error');
     } finally {
       setLoading(false);
     }
@@ -173,6 +176,7 @@ export default function FaceVerifyPage() {
           )}
         </div>
       </div>
+      <canvas ref={canvasRef} className="hidden" />
     </main>
   );
 }
