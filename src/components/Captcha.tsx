@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabaseBrowser } from "~/lib/supabaseClient";
 import { GestureDetector } from "./GestureDetector";
 
@@ -10,10 +10,16 @@ interface Question {
 }
 
 const QUESTION_BANK: Question[] = [
-  { text: "If there are 5 apples and you take away 2, I have 3 apples left.", answer: "yes" },
+  {
+    text: "If there are 5 apples and you take away 2, I have 3 apples left.",
+    answer: "yes",
+  },
   { text: "2 + 1 + 4 + 6 = 13", answer: "yes" },
   { text: "You can put metal in a microwave.", answer: "no" },
-  { text: "One kilogram of feathers weighs more than one kilogram of steel.", answer: "no" },
+  {
+    text: "One kilogram of feathers weighs more than one kilogram of steel.",
+    answer: "no",
+  },
   { text: "You can survive a hackathon without caffeine.", answer: "no" },
   { text: "There are 3 'r's in strawberry.", answer: "yes" },
 ];
@@ -32,11 +38,19 @@ export function Captcha({
   questionCount = 1,
 }: CaptchaProps) {
   const supabase = supabaseBrowser();
-  const [state, setState] = useState<"idle" | "checking" | "failed" | "success">("idle");
+  const [state, setState] = useState<
+    "idle" | "checking" | "failed" | "success"
+  >("idle");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [liveMessage, setLiveMessage] = useState<string>("");
+  const [animateIn, setAnimateIn] = useState(false);
+  const [lastDetection, setLastDetection] = useState<string>("no_tongue");
+  const [lastConfidence, setLastConfidence] = useState<number>(0);
 
   // Pick random questions when dialog opens
   useEffect(() => {
@@ -57,9 +71,13 @@ export function Captcha({
       if (shouldFail) {
         setState("failed");
         setDialogOpen(true);
+        setLiveMessage(
+          "Additional verification required. Answer the question using gestures.",
+        );
       } else {
         setState("success");
         onSuccess();
+        setLiveMessage("Verification successful");
       }
     }, 1500);
   };
@@ -81,6 +99,7 @@ export function Captcha({
 
     if (isCorrect) {
       setFeedback("correct");
+      setLiveMessage("Correct answer");
 
       // Clear buffer
       const {
@@ -100,13 +119,16 @@ export function Captcha({
           setDialogOpen(false);
           setState("success");
           onSuccess();
+          setLiveMessage("Verification complete. You are verified.");
         } else {
           setCurrentIndex(currentIndex + 1);
           setFeedback(null);
+          setLiveMessage(`Question ${currentIndex + 2} of ${questions.length}`);
         }
       }, 1000);
     } else {
       setFeedback("wrong");
+      setLiveMessage("Incorrect answer. Try again.");
 
       // Clear buffer
       const {
@@ -127,63 +149,153 @@ export function Captcha({
 
   const getCheckboxState = () => {
     if (state === "success") return "✓";
-    if (state === "checking") return "⟳";
+    if (state === "checking") return "";
     return "";
+  };
+
+  // Focus the close button when dialog opens and enable Escape to close
+  useEffect(() => {
+    if (dialogOpen) {
+      closeButtonRef.current?.focus();
+    }
+  }, [dialogOpen]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDialogOpen(false);
+        setState("idle");
+        setFeedback(null);
+        setQuestions([]);
+        setCurrentIndex(0);
+        onError?.("User cancelled CAPTCHA");
+        setLiveMessage("Verification cancelled");
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [dialogOpen, onError]);
+
+  // Trigger a small enter animation when the dialog opens
+  useEffect(() => {
+    if (dialogOpen) {
+      // ensure initial frame renders before animating in
+      const id = requestAnimationFrame(() => setAnimateIn(true));
+      return () => cancelAnimationFrame(id);
+    }
+    setAnimateIn(false);
+  }, [dialogOpen]);
+
+  const handleCancel = () => {
+    setDialogOpen(false);
+    setState("idle");
+    setFeedback(null);
+    setQuestions([]);
+    setCurrentIndex(0);
+    onError?.("User cancelled CAPTCHA");
+    setLiveMessage("Verification cancelled");
   };
 
   return (
     <>
       {/* Turnstile-style CAPTCHA */}
-      <div className="inline-block border border-gray-300 rounded bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleClick}
-            disabled={state === "checking" || state === "success"}
-            className={`w-6 h-6 border-2 rounded flex items-center justify-center text-sm font-bold transition ${
-              state === "success"
-                ? "bg-green-500 border-green-600 text-white"
-                : state === "checking"
-                  ? "border-gray-400 animate-spin"
-                  : "border-gray-400 hover:border-gray-500 cursor-pointer"
-            }`}
-          >
-            {getCheckboxState()}
-          </button>
-          <span className="text-sm text-gray-700">
-            {state === "success" ? "Verified" : "I'm not a robot"}
-          </span>
-        </div>
-        <div className="mt-2 text-[10px] text-gray-400 flex items-center gap-1">
-          <span>Protected by</span>
-          <span className="font-semibold">Freak-cha</span>
+      <div className="inline-block rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClick}
+              disabled={state === "checking" || state === "success"}
+              role="checkbox"
+              aria-checked={state === "success"}
+              aria-label="I'm not a robot"
+              aria-busy={state === "checking"}
+              className={`flex h-6 w-6 items-center justify-center rounded border-2 text-sm font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                state === "success"
+                  ? "border-green-600 bg-green-500 text-white"
+                  : "border-gray-400 hover:border-gray-500"
+              }`}
+            >
+              {state === "checking" ? (
+                <span
+                  aria-hidden
+                  className="block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"
+                />
+              ) : (
+                getCheckboxState()
+              )}
+            </button>
+            <span className="text-sm text-gray-800">
+              {state === "success" ? "Verified" : "I'm not a robot"}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[10px] text-gray-500">
+            <span>Protected by</span>
+            <span className="font-semibold text-gray-700">Freak-cha</span>
+          </div>
         </div>
       </div>
 
       {/* Verification Dialog */}
       {dialogOpen && questions.length > 0 && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6 space-y-4">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Verify You're Human
-              </h2>
-              <p className="text-sm text-gray-600 mt-2">
-                Answer using tongue gestures
-              </p>
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+            animateIn ? "bg-black/50 opacity-100" : "bg-black/0 opacity-0"
+          }`}
+          aria-hidden={false}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="captcha-dialog-title"
+            className={`w-full max-w-6xl transform space-y-5 rounded-2xl bg-white p-8 shadow-lg transition-all duration-200 ${
+              animateIn
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-2 scale-95 opacity-0"
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1 text-center">
+                <h2
+                  id="captcha-dialog-title"
+                  className="text-2xl font-bold text-gray-900"
+                >
+                  Verify You're Human
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Answer using tongue gestures
+                </p>
+              </div>
+              <button
+                ref={closeButtonRef}
+                onClick={handleCancel}
+                aria-label="Close verification"
+                className="ml-4 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <span aria-hidden>✕</span>
+              </button>
             </div>
 
             {/* Progress */}
             {questions.length > 1 && (
-              <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-2"
+                aria-label="Progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={questions.length}
+                aria-valuenow={currentIndex + 1}
+              >
                 {questions.map((_, i) => (
                   <div
                     key={i}
-                    className={`flex-1 h-2 rounded-full ${
+                    className={`h-2 flex-1 rounded-full ${
                       i < currentIndex
                         ? "bg-green-500"
                         : i === currentIndex
                           ? "bg-blue-500"
-                          : "bg-gray-300"
+                          : "bg-gray-200"
                     }`}
                   />
                 ))}
@@ -191,31 +303,42 @@ export function Captcha({
             )}
 
             {/* Question */}
-            <div className="bg-gray-100 rounded-xl p-6 text-center">
-              <div className="text-xl font-bold text-gray-900 mb-4">
-                {questions[currentIndex].text}
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6 text-center">
+              <div className="mb-4 text-xl font-bold text-gray-900">
+                {questions[currentIndex]?.text ?? ""}
               </div>
-              <div className="flex gap-4 justify-center text-xs text-gray-600">
+              <div className="flex justify-center gap-6 text-xs text-gray-600">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full" />
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
                   <span>Yes = Up/Down</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full" />
+                  <div className="h-3 w-3 rounded-full bg-red-500" />
                   <span>No = Left/Right</span>
                 </div>
               </div>
             </div>
 
             {/* Video with GestureDetector */}
-            <div className="relative">
-              <GestureDetector onGesture={handleGesture} showDebug />
+            <div className="relative overflow-hidden rounded-xl border border-gray-200">
+              <div className="relative pb-[56.25%]">
+                <div className="absolute inset-0">
+                  <GestureDetector
+                    onGesture={handleGesture}
+                    onDetection={(d, c) => {
+                      setLastDetection(d);
+                      setLastConfidence(c);
+                    }}
+                    showDebug={false}
+                  />
+                </div>
+              </div>
 
               {/* Feedback overlay */}
               {feedback === "correct" && (
-                <div className="absolute inset-0 bg-green-500/20 backdrop-blur-sm rounded-lg flex items-center justify-center border-4 border-green-500 pointer-events-none">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center border-4 border-green-500 bg-green-500/20 backdrop-blur-sm">
                   <div className="text-center">
-                    <div className="text-6xl mb-2">✓</div>
+                    <div className="mb-2 text-6xl">✓</div>
                     <div className="text-2xl font-bold text-green-600">
                       Correct!
                     </div>
@@ -224,15 +347,48 @@ export function Captcha({
               )}
 
               {feedback === "wrong" && (
-                <div className="absolute inset-0 bg-red-500/20 backdrop-blur-sm rounded-lg flex items-center justify-center border-4 border-red-500 pointer-events-none">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center border-4 border-red-500 bg-red-500/20 backdrop-blur-sm">
                   <div className="text-center">
-                    <div className="text-6xl mb-2">✗</div>
+                    <div className="mb-2 text-6xl">✗</div>
                     <div className="text-2xl font-bold text-red-600">
                       Try Again!
                     </div>
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Bottom detections bar */}
+            <div className="rounded-lg bg-gray-900 p-4 text-sm text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-gray-400">Detection: </span>
+                  <span className="font-mono text-green-400">
+                    {lastDetection}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Confidence: </span>
+                  <span className="font-mono">
+                    {(lastConfidence * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Live region for screen readers */}
+            <div role="status" aria-live="polite" className="sr-only">
+              {liveMessage}
             </div>
           </div>
         </div>
