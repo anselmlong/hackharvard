@@ -76,7 +76,7 @@ export async function computeFaceEmbedding(
     frames = 1,
     maxAttemptsPerFrame = 6,
     frameDelayMs = 80,
-    refineLandmarks = true,
+    refineLandmarks = false,
   } = options;
 
   const fm = await loadFaceMesh(refineLandmarks);

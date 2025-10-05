@@ -72,7 +72,7 @@ export default function FaceVerifyPage() {
     return () => {
       active = false;
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-      authListener.subscription.unsubscribe();
+  authListener.subscription.unsubscribe();
       const tracks = (
         videoRef.current?.srcObject as MediaStream | null
       )?.getTracks();
@@ -83,18 +83,16 @@ export default function FaceVerifyPage() {
   const verify = async () => {
     if (!videoRef.current) return;
     setLoading(true);
-  setStatus("Capturing & embedding (3 frames)…");
+    setStatus("Capturing & embedding (3 frames)…");
     try {
-      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 3, refineLandmarks: true });
+      const embedding = await computeFaceEmbedding(videoRef.current, { frames: 3 });
       if (!embedding) {
         setStatus("No face detected. Try again.");
         setLoading(false);
         return;
       }
       console.debug('[verify] embedding length', embedding.vector.length);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         setStatus("Session missing. Re-login.");
         setLoading(false);
@@ -118,9 +116,7 @@ export default function FaceVerifyPage() {
         setThreshold(json.threshold ?? null);
         if (json.match) {
           setStatus("Match confirmed. Redirecting…");
-          setTimeout(() => {
-            router.replace("/");
-          }, 800);
+          setTimeout(() => { router.replace("/"); }, 800);
         } else {
           setStatus("Face did not match. Try again.");
         }
